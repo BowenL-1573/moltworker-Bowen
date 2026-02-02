@@ -8,11 +8,12 @@
 
 set -e
 
-# Check if clawdbot gateway is already running - bail early if so
+# Kill any existing clawdbot gateway processes
 # Note: CLI is still named "clawdbot" until upstream renames it
 if pgrep -f "clawdbot gateway" > /dev/null 2>&1; then
-    echo "Moltbot gateway is already running, exiting."
-    exit 0
+    echo "Found existing Moltbot gateway process, killing it..."
+    pkill -9 -f "clawdbot gateway" || true
+    sleep 2
 fi
 
 # Paths (clawdbot paths are used internally - upstream hasn't renamed yet)
@@ -209,19 +210,34 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
 }
 
 // Base URL override (e.g., for Cloudflare AI Gateway)
-// Usage: Set AI_GATEWAY_BASE_URL or ANTHROPIC_BASE_URL to your endpoint like:
-//   https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic
-//   https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai
 const baseUrl = (process.env.AI_GATEWAY_BASE_URL || process.env.ANTHROPIC_BASE_URL || '').replace(/\/+$/, '');
+const isGoogleAIStudio = baseUrl.includes('/google-ai-studio');
 const isOpenAI = baseUrl.endsWith('/openai');
 
-if (isOpenAI) {
-    // Create custom openai provider config with baseUrl override
-    // Omit apiKey so moltbot falls back to OPENAI_API_KEY env var
+if (isGoogleAIStudio && process.env.GEMINI_API_KEY) {
+    // Google AI Studio via Cloudflare AI Gateway
+    console.log('Configuring Google provider via AI Gateway:', baseUrl);
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers.google = {
+        baseUrl: baseUrl,
+        apiKey: process.env.GEMINI_API_KEY,
+        models: [
+            { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
+            { id: 'gemini-2.5-flash-preview', name: 'Gemini 2.5 Flash' },
+            { id: 'gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro' },
+        ]
+    };
+    config.agents.defaults.model.primary = 'google/gemini-3-flash-preview';
+} else if (process.env.GEMINI_API_KEY) {
+    // Built-in Google provider (direct API)
+    console.log('Using built-in Google provider (direct API)');
+    config.agents.defaults.model.primary = 'google/gemini-3-pro-preview';
+} else if (isOpenAI) {
     console.log('Configuring OpenAI provider with base URL:', baseUrl);
     config.models = config.models || {};
     config.models.providers = config.models.providers || {};
-    config.models.providers.openai = {
+    const providerConfig = {
         baseUrl: baseUrl,
         api: 'openai-responses',
         models: [
@@ -230,7 +246,10 @@ if (isOpenAI) {
             { id: 'gpt-4.5-preview', name: 'GPT-4.5 Preview', contextWindow: 128000 },
         ]
     };
-    // Add models to the allowlist so they appear in /models
+    if (process.env.OPENAI_API_KEY) {
+        providerConfig.apiKey = process.env.OPENAI_API_KEY;
+    }
+    config.models.providers.openai = providerConfig;
     config.agents.defaults.models = config.agents.defaults.models || {};
     config.agents.defaults.models['openai/gpt-5.2'] = { alias: 'GPT-5.2' };
     config.agents.defaults.models['openai/gpt-5'] = { alias: 'GPT-5' };

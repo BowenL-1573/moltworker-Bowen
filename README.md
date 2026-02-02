@@ -11,7 +11,11 @@ Run [OpenClaw](https://github.com/openclaw/openclaw) (formerly Moltbot, formerly
 ## Requirements
 
 - [Workers Paid plan](https://www.cloudflare.com/plans/developer-platform/) ($5 USD/month) — required for Cloudflare Sandbox containers
-- [Anthropic API key](https://console.anthropic.com/) — for Claude access, or you can use AI Gateway's [Unified Billing](https://developers.cloudflare.com/ai-gateway/features/unified-billing/)
+- AI API key from one of the supported providers:
+  - [Anthropic API key](https://console.anthropic.com/) — for Claude models
+  - [OpenAI API key](https://platform.openai.com/) — for GPT models
+  - [Google AI Studio API key](https://aistudio.google.com/apikey) — for Gemini models
+  - Or use AI Gateway's [Unified Billing](https://developers.cloudflare.com/ai-gateway/features/unified-billing/)
 
 The following Cloudflare features used by this project have free tiers:
 - Cloudflare Access (authentication)
@@ -46,7 +50,13 @@ npm install
 # Set your API key (direct Anthropic access)
 npx wrangler secret put ANTHROPIC_API_KEY
 
-# Or use AI Gateway instead (see "Optional: Cloudflare AI Gateway" below)
+# Or use OpenAI
+# npx wrangler secret put OPENAI_API_KEY
+
+# Or use Google Gemini
+# npx wrangler secret put GEMINI_API_KEY
+
+# Or use AI Gateway instead (see "AI Provider Configuration" below)
 # npx wrangler secret put AI_GATEWAY_API_KEY
 # npx wrangler secret put AI_GATEWAY_BASE_URL
 
@@ -326,44 +336,84 @@ node /root/clawd/skills/cloudflare-browser/scripts/video.js "https://site1.com,h
 
 See `skills/cloudflare-browser/SKILL.md` for full documentation.
 
+## AI Provider Configuration
+
+This worker supports three AI providers: **Anthropic (Claude)**, **OpenAI (GPT)**, and **Google (Gemini)**. You can use them in two ways:
+
+### Direct API Access (Recommended for simplicity)
+
+Set only the provider's API key. OpenClaw will connect directly to the provider's API.
+
+```bash
+# Choose one:
+npx wrangler secret put ANTHROPIC_API_KEY  # For Claude
+npx wrangler secret put OPENAI_API_KEY     # For GPT
+npx wrangler secret put GEMINI_API_KEY     # For Gemini
+npm run deploy
+```
+
+### Via Cloudflare AI Gateway (Recommended for analytics/caching)
+
+Route requests through AI Gateway for caching, rate limiting, analytics, and cost tracking.
+
+```bash
+# Set your provider's API key
+npx wrangler secret put GEMINI_API_KEY  # (or ANTHROPIC_API_KEY, OPENAI_API_KEY)
+
+# Set AI Gateway endpoint
+npx wrangler secret put AI_GATEWAY_BASE_URL
+# Examples:
+# - Anthropic: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic
+# - OpenAI: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai
+# - Google: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/google-ai-studio
+
+npm run deploy
+```
+
+### Configuration Logic
+
+The worker automatically detects which mode to use based on the secrets you set:
+
+| Secrets Set | Behavior | Request Flow |
+|-------------|----------|--------------|
+| `ANTHROPIC_API_KEY` only | Direct Anthropic API | Worker → OpenClaw → Anthropic API |
+| `ANTHROPIC_API_KEY` + `AI_GATEWAY_BASE_URL` (non-OpenAI) | Via AI Gateway | Worker → OpenClaw → AI Gateway → Anthropic API |
+| `OPENAI_API_KEY` only | Direct OpenAI API | Worker → OpenClaw → OpenAI API |
+| `OPENAI_API_KEY` + `AI_GATEWAY_BASE_URL` (ends with `/openai`) | Via AI Gateway | Worker → OpenClaw → AI Gateway → OpenAI API |
+| `GEMINI_API_KEY` only | Direct Google API | Worker → OpenClaw → Google AI Studio API |
+| `GEMINI_API_KEY` + `AI_GATEWAY_BASE_URL` (contains `/google-ai-studio`) | Via AI Gateway | Worker → OpenClaw → AI Gateway → Google AI Studio API |
+
+**Benefits of AI Gateway:**
+- Request caching (reduce costs)
+- Analytics and usage tracking
+- Rate limiting
+- Fallback and retry logic
+- Unified billing across providers
+
 ## Optional: Cloudflare AI Gateway
 
-You can route API requests through [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) for caching, rate limiting, analytics, and cost tracking. AI Gateway supports multiple providers — configure your preferred provider in the gateway and use these env vars:
+You can route API requests through [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) for caching, rate limiting, analytics, and cost tracking.
 
 ### Setup
 
 1. Create an AI Gateway in the [AI Gateway section](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway/create-gateway) of the Cloudflare Dashboard.
-2. Add a provider (e.g., Anthropic) to your gateway
-3. Set the gateway secrets:
-
-You'll find the base URL on the Overview tab of your newly created gateway. At the bottom of the page, expand the **Native API/SDK Examples** section and select "Anthropic".
-
-```bash
-# Your provider's API key (e.g., Anthropic API key)
-npx wrangler secret put AI_GATEWAY_API_KEY
-
-# Your AI Gateway endpoint URL
-npx wrangler secret put AI_GATEWAY_BASE_URL
-# Enter: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic
-```
-
+2. Add a provider (e.g., Anthropic, OpenAI, or Google AI Studio) to your gateway
+3. Set the gateway secrets as shown in the "AI Provider Configuration" section above.
 4. Redeploy:
 
 ```bash
 npm run deploy
 ```
 
-The `AI_GATEWAY_*` variables take precedence over `ANTHROPIC_*` if both are set.
-
 ## All Secrets Reference
 
 | Secret | Required | Description |
 |--------|----------|-------------|
-| `AI_GATEWAY_API_KEY` | Yes* | API key for your AI Gateway provider (requires `AI_GATEWAY_BASE_URL`) |
-| `AI_GATEWAY_BASE_URL` | Yes* | AI Gateway endpoint URL (required when using `AI_GATEWAY_API_KEY`) |
-| `ANTHROPIC_API_KEY` | Yes* | Direct Anthropic API key (fallback if AI Gateway not configured) |
-| `ANTHROPIC_BASE_URL` | No | Direct Anthropic API base URL (fallback) |
-| `OPENAI_API_KEY` | No | OpenAI API key (alternative provider) |
+| `ANTHROPIC_API_KEY` | Yes* | Anthropic API key (required if not using OpenAI or Gemini) |
+| `OPENAI_API_KEY` | Yes* | OpenAI API key (alternative to Anthropic) |
+| `GEMINI_API_KEY` | Yes* | Google Gemini API key (alternative to Anthropic/OpenAI) |
+| `AI_GATEWAY_BASE_URL` | No | AI Gateway endpoint URL (optional, for routing through AI Gateway) |
+| `ANTHROPIC_BASE_URL` | No | Custom Anthropic API base URL (optional) |
 | `CF_ACCESS_TEAM_DOMAIN` | Yes* | Cloudflare Access team domain (required for admin UI) |
 | `CF_ACCESS_AUD` | Yes* | Cloudflare Access application audience (required for admin UI) |
 | `MOLTBOT_GATEWAY_TOKEN` | Yes | Gateway token for authentication (pass via `?token=` query param) |
