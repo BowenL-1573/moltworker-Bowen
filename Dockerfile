@@ -32,7 +32,7 @@ COPY start-moltbot.sh /usr/local/bin/start-moltbot.sh
 RUN chmod +x /usr/local/bin/start-moltbot.sh
 
 # Force rebuild
-RUN echo "rebuild-openclaw-v38-$(date +%s)" > /tmp/rebuild-marker
+RUN echo "rebuild-openclaw-v40" > /tmp/rebuild-marker
 
 # Copy default configuration template
 COPY moltbot.json.template /root/.openclaw-templates/moltbot.json.template
