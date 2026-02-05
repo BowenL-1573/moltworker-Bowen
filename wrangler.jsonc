@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "moltbot-sandbox",
+	"name": "openclaw-sandbox",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-05-06",
 	"compatibility_flags": [
@@ -63,12 +63,17 @@
 			"tag": "v1",
 		},
 	],
-	// R2 bucket for persistent storage (moltbot data, conversations, etc.)
+	// R2 buckets for persistent storage
 	"r2_buckets": [
 		{
-			"binding": "MOLTBOT_BUCKET",
-			"bucket_name": "openclaw-data",
-			"preview_bucket_name": "openclaw-data-dev",
+			"binding": "OPENCLAW_BUCKET",
+			"bucket_name": "openclaw-sandbox-data",
+			"preview_bucket_name": "openclaw-sandbox-data-dev",
+		},
+		{
+			"binding": "OPENCLAW_CONNECT_BUCKET",
+			"bucket_name": "openclaw-sandbox-connect",
+			"preview_bucket_name": "openclaw-sandbox-connect-dev",
 		},
 	],
 	// Cron trigger to sync moltbot data to R2 every 5 minutes

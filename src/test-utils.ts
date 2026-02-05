@@ -12,7 +12,8 @@ export function createMockEnv(overrides: Partial<MoltbotEnv> = {}): MoltbotEnv {
   return {
     Sandbox: {} as any,
     ASSETS: {} as any,
-    MOLTBOT_BUCKET: {} as any,
+    OPENCLAW_BUCKET: {} as any,
+    OPENCLAW_CONNECT_BUCKET: {} as any,
     ...overrides,
   };
 }

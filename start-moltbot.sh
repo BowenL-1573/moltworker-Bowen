@@ -8,6 +8,20 @@
 
 set -e
 
+# ============================================================
+# STARTUP LOCK - Non-blocking with 30s auto-release
+# ============================================================
+# Try to acquire lock (non-blocking). If another startup is in progress,
+# exit gracefully. Lock is held for max 30 seconds, then auto-released.
+exec 200>/tmp/openclaw-startup.lock
+if ! flock -n 200; then
+    echo "Another startup is in progress, exiting gracefully"
+    exit 0
+fi
+
+# Release lock after 30 seconds (background process)
+(sleep 30; flock -u 200 2>/dev/null || true) &
+
 # Kill any existing openclaw gateway processes
 if pgrep -f "openclaw gateway" > /dev/null 2>&1; then
     echo "Found existing Moltbot gateway process, killing it..."
@@ -218,78 +232,20 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
     config.channels.slack.enabled = true;
 }
 
-// Base URL override (e.g., for Cloudflare AI Gateway)
-const baseUrl = (process.env.AI_GATEWAY_BASE_URL || process.env.ANTHROPIC_BASE_URL || '').replace(/\/+$/, '');
-const isGoogleAIStudio = baseUrl.includes('/google-ai-studio');
-const isOpenAI = baseUrl.endsWith('/openai');
+// AI Provider Configuration - Direct API connections only
+// Priority: GEMINI_API_KEY > OPENAI_API_KEY > ANTHROPIC_API_KEY (default)
 
-if (isGoogleAIStudio && process.env.GEMINI_API_KEY) {
-    // Google AI Studio via Cloudflare AI Gateway
-    console.log('Configuring Google provider via AI Gateway:', baseUrl);
-    config.models = config.models || {};
-    config.models.providers = config.models.providers || {};
-    config.models.providers.google = {
-        baseUrl: baseUrl,
-        apiKey: process.env.GEMINI_API_KEY,
-        models: [
-            { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
-            { id: 'gemini-2.5-flash-preview', name: 'Gemini 2.5 Flash' },
-            { id: 'gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro' },
-        ]
-    };
+if (process.env.GEMINI_API_KEY) {
+    // Google Gemini (direct API)
+    console.log('Using Google Gemini provider (direct API)');
     config.agents.defaults.model.primary = 'google/gemini-3-flash-preview';
-} else if (process.env.GEMINI_API_KEY) {
-    // Built-in Google provider (direct API)
-    console.log('Using built-in Google provider (direct API)');
-    config.agents.defaults.model.primary = 'google/gemini-3-pro-preview';
-} else if (isOpenAI) {
-    console.log('Configuring OpenAI provider with base URL:', baseUrl);
-    config.models = config.models || {};
-    config.models.providers = config.models.providers || {};
-    const providerConfig = {
-        baseUrl: baseUrl,
-        api: 'openai-responses',
-        models: [
-            { id: 'gpt-5.2', name: 'GPT-5.2', contextWindow: 200000 },
-            { id: 'gpt-5', name: 'GPT-5', contextWindow: 200000 },
-            { id: 'gpt-4.5-preview', name: 'GPT-4.5 Preview', contextWindow: 128000 },
-        ]
-    };
-    if (process.env.OPENAI_API_KEY) {
-        providerConfig.apiKey = process.env.OPENAI_API_KEY;
-    }
-    config.models.providers.openai = providerConfig;
-    config.agents.defaults.models = config.agents.defaults.models || {};
-    config.agents.defaults.models['openai/gpt-5.2'] = { alias: 'GPT-5.2' };
-    config.agents.defaults.models['openai/gpt-5'] = { alias: 'GPT-5' };
-    config.agents.defaults.models['openai/gpt-4.5-preview'] = { alias: 'GPT-4.5' };
-    config.agents.defaults.model.primary = 'openai/gpt-5.2';
-} else if (baseUrl) {
-    console.log('Configuring Anthropic provider with base URL:', baseUrl);
-    config.models = config.models || {};
-    config.models.providers = config.models.providers || {};
-    const providerConfig = {
-        baseUrl: baseUrl,
-        api: 'anthropic-messages',
-        models: [
-            { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5', contextWindow: 200000 },
-            { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', contextWindow: 200000 },
-            { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', contextWindow: 200000 },
-        ]
-    };
-    // Include API key in provider config if set (required when using custom baseUrl)
-    if (process.env.ANTHROPIC_API_KEY) {
-        providerConfig.apiKey = process.env.ANTHROPIC_API_KEY;
-    }
-    config.models.providers.anthropic = providerConfig;
-    // Add models to the allowlist so they appear in /models
-    config.agents.defaults.models = config.agents.defaults.models || {};
-    config.agents.defaults.models['anthropic/claude-opus-4-5-20251101'] = { alias: 'Opus 4.5' };
-    config.agents.defaults.models['anthropic/claude-sonnet-4-5-20250929'] = { alias: 'Sonnet 4.5' };
-    config.agents.defaults.models['anthropic/claude-haiku-4-5-20251001'] = { alias: 'Haiku 4.5' };
-    config.agents.defaults.model.primary = 'anthropic/claude-opus-4-5-20251101';
+} else if (process.env.OPENAI_API_KEY) {
+    // OpenAI (direct API)
+    console.log('Using OpenAI provider (direct API)');
+    config.agents.defaults.model.primary = 'openai/gpt-4o';
 } else {
-    // Default to Anthropic without custom base URL (uses built-in pi-ai catalog)
+    // Anthropic Claude (default, direct API)
+    console.log('Using Anthropic Claude provider (direct API)');
     config.agents.defaults.model.primary = 'anthropic/claude-opus-4-5';
 }
 

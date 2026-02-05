@@ -11,5 +11,11 @@ export const STARTUP_TIMEOUT_MS = 180_000;
 /** Mount path for R2 persistent storage inside the container */
 export const R2_MOUNT_PATH = '/data/moltbot';
 
+/** Mount path for R2 connect bucket (data exchange) inside the container */
+export const R2_CONNECT_MOUNT_PATH = '/data/connect';
+
 /** R2 bucket name for persistent storage */
-export const R2_BUCKET_NAME = 'openclaw-data';
+export const R2_BUCKET_NAME = 'openclaw-sandbox-data';
+
+/** R2 bucket name for data exchange */
+export const R2_CONNECT_BUCKET_NAME = 'openclaw-sandbox-connect';

@@ -16,7 +16,7 @@ RUN npm install -g pnpm
 
 # Install openclaw (renamed from clawdbot)
 # Pin to specific version for reproducible builds
-RUN npm install -g openclaw@2026.2.1 \
+RUN npm install -g openclaw@2026.2.3 \
     && openclaw --version
 
 # Create openclaw directories

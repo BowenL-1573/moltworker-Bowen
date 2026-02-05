@@ -1,13 +1,13 @@
 import type { Sandbox } from '@cloudflare/sandbox';
 import type { MoltbotEnv } from '../types';
-import { R2_MOUNT_PATH, R2_BUCKET_NAME } from '../config';
+import { R2_MOUNT_PATH, R2_BUCKET_NAME, R2_CONNECT_MOUNT_PATH, R2_CONNECT_BUCKET_NAME } from '../config';
 
 /**
  * Check if R2 is already mounted by looking at the mount table
  */
-async function isR2Mounted(sandbox: Sandbox): Promise<boolean> {
+async function isR2Mounted(sandbox: Sandbox, mountPath: string): Promise<boolean> {
   try {
-    const proc = await sandbox.startProcess(`mount | grep "s3fs on ${R2_MOUNT_PATH}"`);
+    const proc = await sandbox.startProcess(`mount | grep "s3fs on ${mountPath}"`);
     // Wait for the command to complete
     let attempts = 0;
     while (proc.status === 'running' && attempts < 10) {
@@ -17,10 +17,10 @@ async function isR2Mounted(sandbox: Sandbox): Promise<boolean> {
     const logs = await proc.getLogs();
     // If stdout has content, the mount exists
     const mounted = !!(logs.stdout && logs.stdout.includes('s3fs'));
-    console.log('isR2Mounted check:', mounted, 'stdout:', logs.stdout?.slice(0, 100));
+    console.log(`isR2Mounted check for ${mountPath}:`, mounted, 'stdout:', logs.stdout?.slice(0, 100));
     return mounted;
   } catch (err) {
-    console.log('isR2Mounted error:', err);
+    console.log(`isR2Mounted error for ${mountPath}:`, err);
     return false;
   }
 }
@@ -39,36 +39,52 @@ export async function mountR2Storage(sandbox: Sandbox, env: MoltbotEnv): Promise
     return false;
   }
 
-  // Check if already mounted first - this avoids errors and is faster
-  if (await isR2Mounted(sandbox)) {
-    console.log('R2 bucket already mounted at', R2_MOUNT_PATH);
-    return true;
+  const credentials = {
+    accessKeyId: env.R2_ACCESS_KEY_ID,
+    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+  };
+  const endpoint = `https://${env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+
+  let dataSuccess = false;
+  let connectSuccess = false;
+
+  // Mount data bucket
+  if (await isR2Mounted(sandbox, R2_MOUNT_PATH)) {
+    console.log('R2 data bucket already mounted at', R2_MOUNT_PATH);
+    dataSuccess = true;
+  } else {
+    try {
+      console.log('Mounting R2 data bucket at', R2_MOUNT_PATH);
+      await sandbox.mountBucket(R2_BUCKET_NAME, R2_MOUNT_PATH, { endpoint, credentials });
+      console.log('R2 data bucket mounted successfully');
+      dataSuccess = true;
+    } catch (err) {
+      console.error('Failed to mount R2 data bucket:', err);
+      if (await isR2Mounted(sandbox, R2_MOUNT_PATH)) {
+        console.log('R2 data bucket is mounted despite error');
+        dataSuccess = true;
+      }
+    }
   }
 
-  try {
-    console.log('Mounting R2 bucket at', R2_MOUNT_PATH);
-    await sandbox.mountBucket(R2_BUCKET_NAME, R2_MOUNT_PATH, {
-      endpoint: `https://${env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      // Pass credentials explicitly since we use R2_* naming instead of AWS_*
-      credentials: {
-        accessKeyId: env.R2_ACCESS_KEY_ID,
-        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-      },
-    });
-    console.log('R2 bucket mounted successfully - moltbot data will persist across sessions');
-    return true;
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.log('R2 mount error:', errorMessage);
-    
-    // Check again if it's mounted - the error might be misleading
-    if (await isR2Mounted(sandbox)) {
-      console.log('R2 bucket is mounted despite error');
-      return true;
+  // Mount connect bucket
+  if (await isR2Mounted(sandbox, R2_CONNECT_MOUNT_PATH)) {
+    console.log('R2 connect bucket already mounted at', R2_CONNECT_MOUNT_PATH);
+    connectSuccess = true;
+  } else {
+    try {
+      console.log('Mounting R2 connect bucket at', R2_CONNECT_MOUNT_PATH);
+      await sandbox.mountBucket(R2_CONNECT_BUCKET_NAME, R2_CONNECT_MOUNT_PATH, { endpoint, credentials });
+      console.log('R2 connect bucket mounted successfully');
+      connectSuccess = true;
+    } catch (err) {
+      console.error('Failed to mount R2 connect bucket:', err);
+      if (await isR2Mounted(sandbox, R2_CONNECT_MOUNT_PATH)) {
+        console.log('R2 connect bucket is mounted despite error');
+        connectSuccess = true;
+      }
     }
-    
-    // Don't fail if mounting fails - moltbot can still run without persistent storage
-    console.error('Failed to mount R2 bucket:', err);
-    return false;
   }
+
+  return dataSuccess || connectSuccess;
 }
