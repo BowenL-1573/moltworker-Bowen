@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "openclaw-sandbox",
+	"name": "openclaw-fix",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-05-06",
 	"compatibility_flags": [
@@ -67,13 +67,13 @@
 	"r2_buckets": [
 		{
 			"binding": "OPENCLAW_BUCKET",
-			"bucket_name": "openclaw-sandbox-data",
-			"preview_bucket_name": "openclaw-sandbox-data-dev",
+			"bucket_name": "openclaw-fix-data",
+			"preview_bucket_name": "openclaw-fix-data-dev",
 		},
 		{
 			"binding": "OPENCLAW_CONNECT_BUCKET",
-			"bucket_name": "openclaw-sandbox-connect",
-			"preview_bucket_name": "openclaw-sandbox-connect-dev",
+			"bucket_name": "openclaw-fix-connect",
+			"preview_bucket_name": "openclaw-fix-connect-dev",
 		},
 	],
 	// Cron trigger to sync moltbot data to R2 every 5 minutes

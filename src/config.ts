@@ -15,7 +15,7 @@ export const R2_MOUNT_PATH = '/data/moltbot';
 export const R2_CONNECT_MOUNT_PATH = '/data/connect';
 
 /** R2 bucket name for persistent storage */
-export const R2_BUCKET_NAME = 'openclaw-sandbox-data';
+export const R2_BUCKET_NAME = 'openclaw-fix-data';
 
 /** R2 bucket name for data exchange */
-export const R2_CONNECT_BUCKET_NAME = 'openclaw-sandbox-connect';
+export const R2_CONNECT_BUCKET_NAME = 'openclaw-fix-connect';
