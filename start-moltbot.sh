@@ -187,8 +187,6 @@ if (config.models?.providers?.anthropic?.models) {
     }
 }
 
-
-
 // Gateway configuration
 config.gateway.port = 18789;
 config.gateway.mode = 'local';
@@ -254,6 +252,14 @@ fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 console.log('Configuration updated successfully');
 console.log('Config:', JSON.stringify(config, null, 2));
 EOFNODE
+
+# ============================================================
+# START FEISHU BRIDGE (Background Process)
+# ============================================================
+if [ -f "/root/clawd/start-feishu.sh" ]; then
+    echo "Starting Feishu Bridge..."
+    bash /root/clawd/start-feishu.sh || echo "⚠️  Feishu Bridge start failed"
+fi
 
 # ============================================================
 # START GATEWAY
