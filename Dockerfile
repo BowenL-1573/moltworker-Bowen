@@ -26,10 +26,11 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd \
     && mkdir -p /root/clawd/skills
 
-# Copy startup script
-# Build cache bust: 2026-02-02-v37-openclaw-migration
+# Copy startup scripts
+# Build cache bust: 2026-02-06-v41-feishu-bridge
 COPY start-moltbot.sh /usr/local/bin/start-moltbot.sh
-RUN chmod +x /usr/local/bin/start-moltbot.sh
+COPY start-feishu.sh /root/clawd/start-feishu.sh
+RUN chmod +x /usr/local/bin/start-moltbot.sh /root/clawd/start-feishu.sh
 
 # Force rebuild
 RUN echo "rebuild-openclaw-v40" > /tmp/rebuild-marker

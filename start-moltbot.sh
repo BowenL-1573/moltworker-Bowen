@@ -256,6 +256,14 @@ console.log('Config:', JSON.stringify(config, null, 2));
 EOFNODE
 
 # ============================================================
+# START FEISHU BRIDGE (Background Process)
+# ============================================================
+if [ -f "/root/clawd/start-feishu.sh" ]; then
+    echo "Starting Feishu Bridge..."
+    bash /root/clawd/start-feishu.sh || echo "⚠️  Feishu Bridge start failed"
+fi
+
+# ============================================================
 # START GATEWAY
 # ============================================================
 # Note: R2 backup sync is handled by the Worker's cron trigger

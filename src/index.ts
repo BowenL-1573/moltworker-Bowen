@@ -292,18 +292,28 @@ app.all('*', async (c) => {
     console.log('[WS] containerWs.readyState:', containerWs.readyState);
     console.log('[WS] serverWs.readyState:', serverWs.readyState);
     
+    // Cleanup function to remove all listeners and prevent memory leaks
+    const cleanup = () => {
+      serverWs.removeEventListener('message', clientToContainer);
+      serverWs.removeEventListener('close', clientClose);
+      serverWs.removeEventListener('error', clientError);
+      containerWs.removeEventListener('message', containerToClient);
+      containerWs.removeEventListener('close', containerClose);
+      containerWs.removeEventListener('error', containerError);
+    };
+    
     // Relay messages from client to container
-    serverWs.addEventListener('message', (event) => {
+    const clientToContainer = (event: MessageEvent) => {
       console.log('[WS] Client -> Container:', typeof event.data, typeof event.data === 'string' ? event.data.slice(0, 200) : '(binary)');
       if (containerWs.readyState === WebSocket.OPEN) {
         containerWs.send(event.data);
       } else {
         console.log('[WS] Container not open, readyState:', containerWs.readyState);
       }
-    });
+    };
     
     // Relay messages from container to client, with error transformation
-    containerWs.addEventListener('message', (event) => {
+    const containerToClient = (event: MessageEvent) => {
       console.log('[WS] Container -> Client (raw):', typeof event.data, typeof event.data === 'string' ? event.data.slice(0, 500) : '(binary)');
       let data = event.data;
       
@@ -328,15 +338,16 @@ app.all('*', async (c) => {
       } else {
         console.log('[WS] Server not open, readyState:', serverWs.readyState);
       }
-    });
+    };
     
     // Handle close events
-    serverWs.addEventListener('close', (event) => {
+    const clientClose = (event: CloseEvent) => {
       console.log('[WS] Client closed:', event.code, event.reason);
       containerWs.close(event.code, event.reason);
-    });
+      cleanup();
+    };
     
-    containerWs.addEventListener('close', (event) => {
+    const containerClose = (event: CloseEvent) => {
       console.log('[WS] Container closed:', event.code, event.reason);
       // Transform the close reason (truncate to 123 bytes max for WebSocket spec)
       let reason = transformErrorMessage(event.reason, url.host);
@@ -345,18 +356,29 @@ app.all('*', async (c) => {
       }
       console.log('[WS] Transformed close reason:', reason);
       serverWs.close(event.code, reason);
-    });
+      cleanup();
+    };
     
     // Handle errors
-    serverWs.addEventListener('error', (event) => {
+    const clientError = (event: Event) => {
       console.error('[WS] Client error:', event);
       containerWs.close(1011, 'Client error');
-    });
+      cleanup();
+    };
     
-    containerWs.addEventListener('error', (event) => {
+    const containerError = (event: Event) => {
       console.error('[WS] Container error:', event);
       serverWs.close(1011, 'Container error');
-    });
+      cleanup();
+    };
+    
+    // Add event listeners
+    serverWs.addEventListener('message', clientToContainer);
+    serverWs.addEventListener('close', clientClose);
+    serverWs.addEventListener('error', clientError);
+    containerWs.addEventListener('message', containerToClient);
+    containerWs.addEventListener('close', containerClose);
+    containerWs.addEventListener('error', containerError);
     
     console.log('[WS] Returning intercepted WebSocket response');
     return new Response(null, {
