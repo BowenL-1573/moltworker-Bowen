@@ -134,6 +134,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
         AUTH_ARGS="--auth-choice apiKey --anthropic-api-key $ANTHROPIC_API_KEY"
     elif [ -n "$OPENAI_API_KEY" ]; then
         AUTH_ARGS="--auth-choice openai-api-key --openai-api-key $OPENAI_API_KEY"
+    elif [ -n "$GEMINI_API_KEY" ]; then
+        AUTH_ARGS="--auth-choice gemini-api-key --gemini-api-key $GEMINI_API_KEY"
     fi
 
     openclaw onboard --non-interactive --accept-risk \
@@ -146,6 +148,12 @@ if [ ! -f "$CONFIG_FILE" ]; then
         --skip-health
 
     echo "Onboard completed"
+    
+    # Set specific model if using Gemini
+    if [ -n "$GEMINI_API_KEY" ]; then
+        echo "Setting Gemini model to gemini-3-flash-preview..."
+        openclaw models set google/gemini-3-flash-preview
+    fi
 else
     echo "Using existing config"
 fi
@@ -212,8 +220,8 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
 
     let baseUrl;
     if (accountId && gatewayId) {
-        baseUrl = 'https://gateway.ai.cloudflare.com/v1/' + accountId + '/' + gatewayId + '/' + gwProvider;
-        if (gwProvider === 'workers-ai') baseUrl += '/v1';
+        // Use /compat endpoint for OpenAI-compatible API across all providers
+        baseUrl = 'https://gateway.ai.cloudflare.com/v1/' + accountId + '/' + gatewayId + '/compat';
     } else if (gwProvider === 'workers-ai' && process.env.CF_ACCOUNT_ID) {
         baseUrl = 'https://api.cloudflare.com/client/v4/accounts/' + process.env.CF_ACCOUNT_ID + '/ai/v1';
     }
@@ -228,12 +236,13 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
             baseUrl: baseUrl,
             apiKey: apiKey,
             api: api,
-            models: [{ id: modelId, name: modelId, contextWindow: 131072, maxTokens: 8192 }],
+            // Use full provider/model format for compat endpoint
+            models: [{ id: gwProvider + '/' + modelId, name: modelId, contextWindow: 131072, maxTokens: 8192 }],
         };
         config.agents = config.agents || {};
         config.agents.defaults = config.agents.defaults || {};
-        config.agents.defaults.model = { primary: providerName + '/' + modelId };
-        console.log('AI Gateway model override: provider=' + providerName + ' model=' + modelId + ' via ' + baseUrl);
+        config.agents.defaults.model = { primary: providerName + '/' + gwProvider + '/' + modelId };
+        console.log('AI Gateway model override: provider=' + providerName + ' model=' + gwProvider + '/' + modelId + ' via ' + baseUrl);
     } else {
         console.warn('CF_AI_GATEWAY_MODEL set but missing required config (account ID, gateway ID, or API key)');
     }
