@@ -43,7 +43,7 @@
 		{
 			"class_name": "Sandbox",
 			"image": "./Dockerfile",
-			"instance_type": "standard-1",
+			"instance_type": "standard-4",
 			"max_instances": 1,
 		},
 	],
@@ -70,10 +70,10 @@
 			"bucket_name": "moltbot-data",
 		},
 	],
-	// Cron trigger to sync moltbot data to R2 every 5 minutes
+	// Cron trigger to sync moltbot data to R2 every hour
 	"triggers": {
 		"crons": [
-			"*/5 * * * *"
+			"0 * * * *"
 		],
 	},
 	// Browser Rendering binding for CDP shim

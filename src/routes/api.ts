@@ -307,6 +307,24 @@ adminApi.post('/gateway/restart', async (c) => {
   }
 });
 
+// POST /api/admin/container/restart - Destroy and restart the entire container
+adminApi.post('/container/restart', async (c) => {
+  const sandbox = c.get('sandbox');
+
+  try {
+    console.log('Destroying container...');
+    await sandbox.destroy();
+    
+    return c.json({
+      success: true,
+      message: 'Container destroyed. It will restart on the next request (cold start ~1-2 minutes).',
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.json({ error: errorMessage }, 500);
+  }
+});
+
 // Mount admin API routes under /admin
 api.route('/admin', adminApi);
 

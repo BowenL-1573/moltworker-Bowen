@@ -113,6 +113,18 @@ export async function restartGateway(): Promise<RestartGatewayResponse> {
   });
 }
 
+export interface RestartContainerResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+export async function restartContainer(): Promise<RestartContainerResponse> {
+  return apiRequest<RestartContainerResponse>('/container/restart', {
+    method: 'POST',
+  });
+}
+
 export interface StorageStatusResponse {
   configured: boolean;
   missing?: string[];

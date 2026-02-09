@@ -4,6 +4,7 @@ import {
   approveDevice,
   approveAllDevices,
   restartGateway,
+  restartContainer,
   getStorageStatus,
   triggerSync,
   AuthError,
@@ -53,6 +54,7 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [restartInProgress, setRestartInProgress] = useState(false);
+  const [containerRestartInProgress, setContainerRestartInProgress] = useState(false);
   const [syncInProgress, setSyncInProgress] = useState(false);
 
   const fetchDevices = useCallback(async () => {
@@ -142,7 +144,6 @@ export default function AdminPage() {
       const result = await restartGateway();
       if (result.success) {
         setError(null);
-        // Show success message briefly
         alert('Gateway restart initiated. Clients will reconnect automatically.');
       } else {
         setError(result.error || 'Failed to restart gateway');
@@ -151,6 +152,31 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : 'Failed to restart gateway');
     } finally {
       setRestartInProgress(false);
+    }
+  };
+
+  const handleRestartContainer = async () => {
+    if (
+      !confirm(
+        'Are you sure you want to restart the entire container? This will cause a cold start (~1-2 minutes) and disconnect all clients.',
+      )
+    ) {
+      return;
+    }
+
+    setContainerRestartInProgress(true);
+    try {
+      const result = await restartContainer();
+      if (result.success) {
+        setError(null);
+        alert(result.message || 'Container restart initiated.');
+      } else {
+        setError(result.error || 'Failed to restart container');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to restart container');
+    } finally {
+      setContainerRestartInProgress(false);
     }
   };
 
@@ -242,8 +268,26 @@ export default function AdminPage() {
           </button>
         </div>
         <p className="hint">
-          Restart the gateway to apply configuration changes or recover from errors. All connected
-          clients will be temporarily disconnected.
+          Restart the gateway process to apply configuration changes or recover from errors. All connected
+          clients will be temporarily disconnected (~5 seconds).
+        </p>
+      </section>
+
+      <section className="devices-section gateway-section">
+        <div className="section-header">
+          <h2>Container Controls</h2>
+          <button
+            className="btn btn-danger"
+            onClick={handleRestartContainer}
+            disabled={containerRestartInProgress}
+          >
+            {containerRestartInProgress && <ButtonSpinner />}
+            {containerRestartInProgress ? 'Restarting...' : 'Restart Container'}
+          </button>
+        </div>
+        <p className="hint">
+          Restart the entire container instance. This causes a cold start (~1-2 minutes) and should only be used
+          when the gateway restart doesn't resolve issues.
         </p>
       </section>
 

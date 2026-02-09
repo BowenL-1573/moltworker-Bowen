@@ -46,11 +46,23 @@ export async function syncToR2(sandbox: Sandbox, env: MoltbotEnv): Promise<SyncR
 
   // Sync to the new openclaw/ R2 prefix (even if source is legacy .clawdbot)
   // Also sync workspace directory (excluding skills since they're synced separately)
-  const syncCmd = `rsync -r --no-times --delete --exclude='*.lock' --exclude='*.log' --exclude='*.tmp' ${configDir}/ ${R2_MOUNT_PATH}/openclaw/ && rsync -r --no-times --delete --exclude='skills' /root/clawd/ ${R2_MOUNT_PATH}/workspace/ && rsync -r --no-times --delete /root/clawd/skills/ ${R2_MOUNT_PATH}/skills/ && date -Iseconds > ${R2_MOUNT_PATH}/.last-sync`;
+  // Use flock to prevent concurrent syncs from overlapping
+  const syncCmd = `flock -n /tmp/r2-sync.lock -c 'rsync -r --no-times --delete --exclude="*.lock" --exclude="*.log" --exclude="*.tmp" ${configDir}/ ${R2_MOUNT_PATH}/openclaw/ && rsync -r --no-times --delete --exclude="skills" /root/clawd/ ${R2_MOUNT_PATH}/workspace/ && rsync -r --no-times --delete /root/clawd/skills/ ${R2_MOUNT_PATH}/skills/ && date -Iseconds > ${R2_MOUNT_PATH}/.last-sync'`;
 
   try {
     const proc = await sandbox.startProcess(syncCmd);
     await waitForProcess(proc, 30000); // 30 second timeout for sync
+
+    const logs = await proc.getLogs();
+
+    // Check if flock failed to acquire lock (sync already in progress)
+    if (logs.stderr?.includes('flock') || logs.exitCode === 1) {
+      return {
+        success: false,
+        error: 'Sync already in progress',
+        details: 'Previous sync has not completed yet. Will retry on next cron trigger.',
+      };
+    }
 
     // Check for success by reading the timestamp file
     const timestampProc = await sandbox.startProcess(`cat ${R2_MOUNT_PATH}/.last-sync`);
@@ -61,7 +73,6 @@ export async function syncToR2(sandbox: Sandbox, env: MoltbotEnv): Promise<SyncR
     if (lastSync && lastSync.match(/^\d{4}-\d{2}-\d{2}/)) {
       return { success: true, lastSync };
     } else {
-      const logs = await proc.getLogs();
       return {
         success: false,
         error: 'Sync failed',
